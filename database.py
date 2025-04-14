@@ -3,44 +3,53 @@ import os
 
 class Database:
     def __init__(self):
-        self.conn = sqlite3.connect('ged.db')
+        self.conn = sqlite3.connect('documents.db')
         self.create_tables()
     
     def create_tables(self):
         cursor = self.conn.cursor()
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS documents (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                reference TEXT UNIQUE,
-                date TEXT,
-                expediteur TEXT,
-                destinataire TEXT,
-                objet TEXT,
-                contenu TEXT,
-                type_doc TEXT,
-                file_path TEXT
-            )
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero_dossier TEXT NOT NULL,
+            modele TEXT,
+            langue TEXT,
+            titer TEXT,
+            date TEXT,
+            departement TEXT,
+            emplacement TEXT,
+            objet TEXT NOT NULL,
+            contenu TEXT,
+            type TEXT,
+            file_path TEXT
+        )
         ''')
         self.conn.commit()
     
-    def add_document(self, reference, date, expediteur, destinataire, objet, contenu, type_doc, file_path=None):
+    def add_document(self, **kwargs):
         cursor = self.conn.cursor()
-        cursor.execute('''
-            INSERT INTO documents 
-            (reference, date, expediteur, destinataire, objet, contenu, type_doc, file_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (reference, date, expediteur, destinataire, objet, contenu, type_doc, file_path))
+        fields = ', '.join(kwargs.keys())
+        placeholders = ', '.join(['?' for _ in kwargs])
+        values = tuple(kwargs.values())
+        
+        query = f'INSERT INTO documents ({fields}) VALUES ({placeholders})'
+        cursor.execute(query, values)
         self.conn.commit()
     
     def search_documents(self, criteria):
         cursor = self.conn.cursor()
-        query = "SELECT * FROM documents WHERE 1=1"
-        params = []
+        conditions = []
+        values = []
         
-        for key, value in criteria.items():
+        for field, value in criteria.items():
             if value:
-                query += f" AND {key} LIKE ?"
-                params.append(f"%{value}%")
+                conditions.append(f"{field} LIKE ?")
+                values.append(f"%{value}%")
         
-        cursor.execute(query, params)
+        if conditions:
+            query = "SELECT * FROM documents WHERE " + " AND ".join(conditions)
+            cursor.execute(query, values)
+        else:
+            cursor.execute("SELECT * FROM documents")
+            
         return cursor.fetchall()

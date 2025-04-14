@@ -22,15 +22,19 @@ class GEDApp:
         input_frame = ttk.LabelFrame(self.root, text="Nouveau document")
         input_frame.pack(fill="x", padx=5, pady=5)
         
-        labels = ["Référence", "Date", "Expéditeur", "Destinataire", "Objet", "Contenu", "Type"]
+        labels = ["Numero du dossier", "Modele", "Langue", "Titer","Date", "Departement", "Emplacement physique", "Objet", "Contenu", "Type"]
         self.entries = {}
         
         for i, label in enumerate(labels):
             ttk.Label(input_frame, text=label).grid(row=i, column=0, padx=5, pady=2)
-            if label == "Contenu":
+            if label == "Modele":
+                self.entries[label.lower()] = ttk.Combobox(input_frame, values=["Document logistlatif", "couriel"])
+            elif label == "Langue":
+                self.entries[label.lower()] = ttk.Combobox(input_frame, values=["Français", "Arabe"])
+            elif label == "Contenu":
                 self.entries[label.lower()] = tk.Text(input_frame, height=3)
             elif label == "Type":
-                self.entries[label.lower()] = ttk.Combobox(input_frame, values=["Manuscrit", "Courriel"])
+                self.entries[label.lower()] = ttk.Combobox(input_frame, values=["arrété", "décret", "projet de loi", "loi","Courriel depart", "Couriel Arriver"])
             else:
                 self.entries[label.lower()] = ttk.Entry(input_frame)
             self.entries[label.lower()].grid(row=i, column=1, padx=5, pady=2)
@@ -59,12 +63,21 @@ class GEDApp:
         search_frame = ttk.LabelFrame(self.root, text="Recherche")
         search_frame.pack(fill="x", padx=5, pady=5)
         
-        self.search_var = tk.StringVar()
-        ttk.Entry(search_frame, textvariable=self.search_var).pack(side="left", padx=5)
-        ttk.Button(search_frame, text="Rechercher", command=self.search_documents).pack(side="left", padx=5)
+        # Créer des champs de recherche
+        search_fields = ["Numero du dossier", "Date", "Departement", "Type", "Objet"]
+        self.search_entries = {}
+        
+        for i, field in enumerate(search_fields):
+            ttk.Label(search_frame, text=field).grid(row=i//2, column=(i%2)*2, padx=5, pady=2)
+            self.search_entries[field.lower()] = ttk.Entry(search_frame)
+            self.search_entries[field.lower()].grid(row=i//2, column=(i%2)*2+1, padx=5, pady=2)
+
+        ttk.Button(search_frame, text="Rechercher", command=self.search_documents).grid(
+            row=len(search_fields)//2 + 1, column=0, columnspan=4, pady=10
+        )
     
     def create_results_table(self):
-        columns = ("reference", "date", "expediteur", "destinataire", "objet", "type_doc", "file_path")
+        columns = ("numero_dossier", "date", "departement", "type", "objet", "emplacement", "file_path")
         self.tree = ttk.Treeview(self.root, columns=columns, show="headings")
         
         for col in columns[:-1]:  # On n'affiche pas le chemin du fichier
@@ -78,18 +91,27 @@ class GEDApp:
 
     def add_document(self):
         doc_data = {
-            'reference': self.entries['référence'].get(),
+            'numero_dossier': self.entries['numero du dossier'].get(),
             'date': self.entries['date'].get(),
-            'expediteur': self.entries['expéditeur'].get(),
-            'destinataire': self.entries['destinataire'].get(),
+            'departement': self.entries['departement'].get(),
+            'type': self.entries['type'].get(),
             'objet': self.entries['objet'].get(),
-            'contenu': self.entries['contenu'].get("1.0", tk.END).strip(),
-            'type_doc': self.entries['type'].get(),
+            'emplacement': self.entries['emplacement physique'].get(),
             'file_path': self.file_path
         }
         
-        if not doc_data['reference'] or not doc_data['objet']:
-            messagebox.showerror("Erreur", "La référence et l'objet sont obligatoires.")
+        # Optional fields not shown in table but stored in DB
+        if 'modele' in self.entries:
+            doc_data['modele'] = self.entries['modele'].get()
+        if 'langue' in self.entries:
+            doc_data['langue'] = self.entries['langue'].get()
+        if 'titer' in self.entries:
+            doc_data['titer'] = self.entries['titer'].get()
+        if 'contenu' in self.entries:
+            doc_data['contenu'] = self.entries['contenu'].get("1.0", tk.END).strip()
+        
+        if not doc_data['numero_dossier'] or not doc_data['objet']:
+            messagebox.showerror("Erreur", "Le numéro du dossier et l'objet sont obligatoires.")
             return
         
         self.db.add_document(**doc_data)
@@ -98,14 +120,20 @@ class GEDApp:
         self.search_documents()  # Rafraîchir la liste
     
     def search_documents(self):
-        criteria = {'objet': self.search_var.get()}
+        criteria = {
+            'numero_dossier': self.search_entries['numero du dossier'].get(),
+            'date': self.search_entries['date'].get(),
+            'departement': self.search_entries['departement'].get(),
+            'type': self.search_entries['type'].get(),
+            'objet': self.search_entries['objet'].get()
+        }
         results = self.db.search_documents(criteria)
         
         for item in self.tree.get_children():
             self.tree.delete(item)
         
         for doc in results:
-            self.tree.insert("", "end", values=doc[1:])  # On affiche les résultats sans l'ID
+            self.tree.insert("", "end", values=doc[1:])
 
     def open_selected_file(self):
         selected_item = self.tree.selection()
