@@ -53,3 +53,35 @@ class Database:
             cursor.execute("SELECT * FROM documents")
             
         return cursor.fetchall()
+    
+    def get_document(self, document_id):
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM documents WHERE id = ?", (document_id,))
+        return cursor.fetchone()
+    
+    def update_document(self, document_id, **kwargs):
+        cursor = self.conn.cursor()
+        
+        # Construire les parties SET de la requête
+        set_parts = []
+        values = []
+        
+        for field, value in kwargs.items():
+            set_parts.append(f"{field} = ?")
+            values.append(value)
+        
+        # Ajouter l'ID à la fin des valeurs pour le WHERE
+        values.append(document_id)
+        
+        query = f"UPDATE documents SET {', '.join(set_parts)} WHERE id = ?"
+        cursor.execute(query, values)
+        self.conn.commit()
+    
+    def delete_document(self, document_id):
+        cursor = self.conn.cursor()
+        cursor.execute("DELETE FROM documents WHERE id = ?", (document_id,))
+        self.conn.commit()
+    
+    def __del__(self):
+        if hasattr(self, 'conn'):
+            self.conn.close()
