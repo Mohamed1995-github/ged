@@ -1,9 +1,12 @@
+# database.py
+
 import sqlite3
 import os
 
 class Database:
-    def __init__(self):
-        self.conn = sqlite3.connect('documents.db')
+    def __init__(self, db_path='documents.db'):
+        # ouvre (ou crée) la base
+        self.conn = sqlite3.connect(db_path)
         self.create_tables()
     
     def create_tables(self):
@@ -18,6 +21,10 @@ class Database:
             date TEXT,
             departement TEXT,
             emplacement TEXT,
+            numero_boite TEXT,
+            salle TEXT,
+            etagere TEXT,
+            rayon TEXT,
             objet TEXT NOT NULL,
             contenu TEXT,
             type TEXT,
@@ -29,7 +36,7 @@ class Database:
     def add_document(self, **kwargs):
         cursor = self.conn.cursor()
         fields = ', '.join(kwargs.keys())
-        placeholders = ', '.join(['?' for _ in kwargs])
+        placeholders = ', '.join('?' for _ in kwargs)
         values = tuple(kwargs.values())
         
         query = f'INSERT INTO documents ({fields}) VALUES ({placeholders})'
@@ -54,26 +61,27 @@ class Database:
             
         return cursor.fetchall()
     
-    def get_document(self, document_id):
+    def get_document_by_numero(self, numero_dossier):
+        """
+        Renvoie un dict {colonne: valeur} ou None si pas trouvé.
+        """
         cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM documents WHERE id = ?", (document_id,))
-        return cursor.fetchone()
+        cursor.execute("SELECT * FROM documents WHERE numero_dossier = ?", (numero_dossier,))
+        row = cursor.fetchone()
+        if not row:
+            return None
+        cols = [col[0] for col in cursor.description]
+        return dict(zip(cols, row))
     
     def update_document(self, document_id, **kwargs):
         cursor = self.conn.cursor()
-        
-        # Construire les parties SET de la requête
-        set_parts = []
+        parts = []
         values = []
-        
         for field, value in kwargs.items():
-            set_parts.append(f"{field} = ?")
+            parts.append(f"{field} = ?")
             values.append(value)
-        
-        # Ajouter l'ID à la fin des valeurs pour le WHERE
         values.append(document_id)
-        
-        query = f"UPDATE documents SET {', '.join(set_parts)} WHERE id = ?"
+        query = f"UPDATE documents SET {', '.join(parts)} WHERE id = ?"
         cursor.execute(query, values)
         self.conn.commit()
     
